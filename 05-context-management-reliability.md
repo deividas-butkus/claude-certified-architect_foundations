@@ -114,9 +114,77 @@ Set `≤ deadline`, solve for `T`.
 
 ---
 
+## Structuring multi-part work — batch vs. chain vs. fan-out
+
+> **Two independent axes decide the shape. Dependency decides *ordering* (chain vs. not); context-load/isolation decides *where* (one context vs. many). Evaluate them per-item, not for the group.**
+
+**Axis 1 — dependency (does step B need step A's *output*?):**
+- **No dependency → do not chain.** Independent items can share one message.
+- **Dependency → chain/stage.** B is written/diagnosed against A's actual result; running them together (or in parallel) makes B work against stale state.
+
+**Axis 2 — context load / isolation (given independence, how heavy is each item?):**
+- **Light enough to hold together → batch** in one message. Independence is *necessary but not sufficient* for batching.
+- **Too heavy / too many to fit, or reads flood the main thread → fan out** to parallel `claude -p` invocations or subagents.
+
+| Dependent? | Heavy / many / reads-heavy? | Shape |
+|---|---|---|
+| Yes (B needs A) | — | **Chain** — sequential, share context. Never parallelize (B sees stale state). |
+| No | No (small, cheap) | **Batch** — one message, full context, one pass. |
+| No | Yes | **Fan out** — parallel invocations (`--allowedTools` scoped) or a research subagent that reports a summary. |
+
+- **Passes ≈ dependency-edges + 1.** Zero edges → one batched pass; one edge → two stages; etc. "Related / same file" is **not** an edge — locality ≠ dependency.
+- **Mixed batch splits along the weight seam, not down the middle:** 4 one-line fixes + 1 heavy investigate → batch the 4, isolate the 1 (subagent). *(the "5 fixes" case)*
+- **Ordering-dependency ≠ inspection-dependency.** *Sequential and self-carrying* (refactor → changelog → PR) → **one ordered prompt**; Claude runs the chain internally. *Sequential but you must see/gate on the middle* (confirm the return type before diagnosing bug 2; "review the plan before coding") → **chain across turns**. Modern models handle multi-step *reasoning* internally, so explicit chaining now earns its keep mainly when **you** need the intermediate surfaced (inspect / branch / log).
+- **File-count is a *proxy* for context load, never the trigger.** 40 typo fixes may batch; 5 large-module reads may need fan-out. Boundary = "does the combined context fit *with headroom*," not a task count. On the exam, a specific number in the stem is usually the distractor; the real cue is "large / reads many files / isolated / in parallel."
+- **Fan-out also buys wall-clock parallelism** — but that's a throughput choice, not a correctness one; exam correctness answers key off context, not speed.
+
+**Traps:** "same function/module ⇒ batch" (locality masquerading as independence — Q of the reconciliation-function type); "independent ⇒ *always* batch" (ignores heavy item — over-crams context); "sequential ⇒ split into messages" (ignores self-carrying case — needless round-trips); fanning out featherweight edits (sledgehammer — subagents need independence **and** weight); parallelizing a dependent chain (B reads stale state).
+
+*(source: [code.claude.com/docs/en/best-practices](https://code.claude.com/docs/en/best-practices) · [prompt-engineering: chain complex prompts / subagents](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices))*
+
+---
+
+## `/clear` vs. `/compact` — relevance vs. volume
+
+> **Degraded output in a long session has two different causes with opposite fixes. Diagnose the cause before reaching for a command.**
+
+| Cause | Symptom | Fix |
+|---|---|---|
+| **Pollution** (irrelevant context — the "kitchen sink") | you switched topics mid-session; old topic bleeds into the new | **`/clear`** between unrelated tasks (or after 2 failed corrections — the context is cluttered with dead ends) |
+| **Volume** (relevant context, but full) | deep in *one* problem, history all on-topic, nearing the ceiling | **`/compact`** — lossy summarization that keeps code/decisions, drops verbose transcript. Not `/clear` (that discards the signal). |
+
+- **Context economy = keep it *relevant*, not keep it *small*.** When you're deep in one complex problem and the history is directly relevant, **letting it accumulate is correct** — don't clear it. ("smaller window always faster" is the overcorrection trap.)
+- **Compaction is lossy and model-judged** → for anything critical, **pin findings to a file** (scratchpad / NOTES.md) *before* compacting; a file survives compaction, `/clear`, and session close. Steer with `/compact <focus>` or a CLAUDE.md "when compacting, preserve…" line. `Esc+Esc` → *Summarize from here* compacts only a chosen span.
+- **`/clear`-then-repaste ≠ compaction** — pure churn; use `/compact`.
+
+**Traps:** `/clear` on a relevant-but-full session (throws away signal); "bigger window" for a *pollution* problem (just holds more noise); treating a *volume* problem as a prompt problem (more detail in a polluted context doesn't help); trusting lossy compaction alone for must-keep findings.
+
+*(source: [code.claude.com/docs/en/best-practices](https://code.claude.com/docs/en/best-practices) — context management, failure patterns)*
+
+---
+
+## Self-verification — legitimate when the judge is external
+
+> **"Give Claude a check it can run" is sound *because the arbiter is an external oracle* (tests/build/lint/fixture-diff), not the model's own judgment. Self-*judgment* with no oracle is the weak form.**
+
+Verification strength, strongest → weakest:
+1. **Deterministic external gate** — Stop hook / CI running real tests. Model can't fudge a red exit code.
+2. **Independent adversarial reviewer** — fresh subagent sees only the diff, prompted to refute (not a fork — a fork inherits the bias). For judgment tests can't cover.
+3. **Self-check against an external oracle** — model runs its own tests and iterates until pass. Good: runner is the author, but the *arbiter* is external. ← the default "verification loop."
+4. **Self-judgment, no oracle** — "does this look right?" Weakest; confirmation bias applies fully.
+
+- Unattended runs escalate 3 → 1/2 (Stop hook, `/goal` condition, review subagent) — "the agent doing the work isn't the one grading it."
+- Counter-trap: a reviewer prompted to find gaps *will* find some even when the work is sound → over-engineering. Tell it to flag only correctness/requirement gaps.
+
+**Traps:** calling self-verification an anti-pattern wholesale (only level 4 is weak; level 3 is recommended); relying on level 4 for high-stakes work; chasing every adversarial finding.
+
+*(source: [code.claude.com/docs/en/best-practices](https://code.claude.com/docs/en/best-practices) — verify your work, adversarial review · ties to D1 evaluator-optimizer)*
+
+---
+
 ## To expand
 
-- [ ] Context window management; compaction / `/compact`; long-running agents
+- [x] Context window management; compaction / `/compact`; long-running agents *(done — see "batch vs. chain vs. fan-out", "/clear vs /compact", "self-verification" above)*
 - [ ] Prompt caching (TTL, cache breakpoints, cost)
 - [x] Batch API SLA timing budget *(done — see above)* · still to cover: token counting, batch mechanics (submit/poll/results, 50% discount)
 - [ ] Effective context engineering for agents (Anthropic guide)
