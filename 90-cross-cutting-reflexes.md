@@ -56,6 +56,7 @@
 - **Context or config?** Context is *added* (concatenated, nothing dropped); config *selects one* (rest discarded). Then mind the **direction trap** — skills = me first (Personal > Project), MCP = here first (Local > Project > User); opposite ways. *(D2/D3)*
 
 - Verification gates **actions, not audiences** — *authenticate ≠ authorize*.
+- **Authentication fails → identity proofing.** *Prove credential control* (account #, PIN, card digits — "know it") ≠ *prove the person* ("prove it"). When credentials are unavailable **and** accounts are ambiguous, you can't authenticate → escalate to ID-proofing: Anthropic's partner is **Persona (govt photo ID + live selfie)**. **Read the trigger, then match the mechanism:** *flag / suspension / abuse / appeal* ⇒ **Persona**; *billing / "which account is mine"* ⇒ authentication (no documented Persona path). Bank/telco **"PIN on file" is a fabricated mechanism** — Anthropic accounts have none. *(trust & safety · [doc](https://support.claude.com/en/articles/14328960-identity-verification-on-claude))*
 - **`deny` stops the action, not the agent** — the reason returns to the model.
 - A **guarantee** needs **code, not a prompt** — enforce with hooks / constrained decoding.
 - Fix the error **where it originates** — model output vs external tool.
