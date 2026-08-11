@@ -66,6 +66,22 @@
 
 ---
 
+### Symlinks & permission rules — two paths checked, allow/deny asymmetric
+
+> **When Claude accesses a symlink, permission rules check *both* the link path *and* its resolved target. Allow needs *both* to match; deny fires if *either* matches.** (This is the **permission** subsystem — unrelated to path-scoped *rule* matching through a symlinked checkout, [above](#version-gated-path-rule-behaviors).)
+
+- **Allow rule** = AND — applies only when **both** the symlink path and its target match. A symlink inside an allowed dir pointing **outside** it still **prompts** (target fails the allow).
+- **Deny rule** = OR — applies when **either** the symlink path **or** its target matches. A link pointing to a denied file is itself denied.
+- Docs' canonical example: `Read(./project/**)` allowed + `Read(~/.ssh/**)` denied → a symlink `./project/key` → `~/.ssh/id_rsa` is **blocked** (target fails allow **and** matches deny).
+- `Cd` deny goes further: checks **every spelling of the target, including each symlink hop it resolves through**.
+- **Two subsystems, one access — deny resolves first.** A file reached via a symlink can *both* match a `paths:` rule (v2.1.198, so the rule's instructions *would* load) *and* be blocked by a permission deny. The permission gate is a hard client-side check that wins before any rule-context matters → the rule never takes effect on a denied read. Don't let "the rule matches" distract from "the read is denied."
+
+**Trap:** treating `paths:` frontmatter as a permission filter (it's **context-loading** scope, never denies a read); assuming allow rules only check the link's own path (they need the target too — the asymmetry is the whole point).
+
+*(source: [code.claude.com/docs/en/permissions](https://code.claude.com/docs/en/permissions) — symlink resolution for Read/Edit and Cd rules)*
+
+---
+
 ### Headless reproducibility — `--bare` is a discovery switch, not a sandbox
 
 > **`--bare` = deny-by-default on *ambient config*: skips auto-discovery of hooks, skills, plugins, MCP servers, auto-memory, CLAUDE.md. Config flips from *discovered* (varies per machine) → *declared* (identical everywhere). "Only flags you pass explicitly take effect."**
