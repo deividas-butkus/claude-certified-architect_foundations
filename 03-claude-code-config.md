@@ -229,6 +229,28 @@
 
 ---
 
+### Commands ARE skills — one system, invocation is a frontmatter axis (not a mechanism choice)
+
+> **"Custom slash command vs skill" is a dead distinction: custom commands have been *merged into* skills.** `.claude/commands/deploy.md` and `.claude/skills/deploy/SKILL.md` both create `/deploy` and behave the same. `.claude/commands/` files keep working; skills are the superset (add a supporting-file dir, `disable-model-invocation`/`user-invocable` frontmatter, and Claude-can-auto-load). **So the real question is never "command or skill" — it's *who may invoke this one skill*.**
+
+- **Default = BOTH can invoke.** You type `/name`; Claude auto-loads it when the `description` matches. The two frontmatter fields *subtract* from that default (they don't define "command-ness"):
+
+  | Frontmatter | You (`/name`) | Claude (auto) | Description in context |
+  |---|---|---|---|
+  | *(default)* | ✅ | ✅ | Always (full body loads on invoke) |
+  | `disable-model-invocation: true` | ✅ | ❌ | **Not** loaded (loads only when you invoke) |
+  | `user-invocable: false` | ❌ | ✅ | Always |
+
+- **The 8-step deploy checklist maps here.** A stored procedure → a skill (body loads on demand, ~zero per-turn cost). To get the old "command" feel — *only I trigger it, Claude won't auto-run a deploy because the code looks ready* — add **`disable-model-invocation: true`** (the docs' literal `/deploy` example). That's a **flag on one skill**, not "make it a command instead of a skill."
+- **Auto-invocation is a *feature you can turn off*, not the definition of a skill.** Manual `/name` isn't unique to old commands — every user-invocable skill has it. So "command = manual, skill = auto" is a false split; both live on one axis of one system.
+- Distinct from *subagents* (`.claude/agents/`): a subagent's body is a *separate agent's system prompt* that runs in an **isolated context** and returns a summary — delegate-and-isolate, not store-and-surface. It *can* physically hold a checklist, but invoking it hands execution to another agent instead of surfacing steps in the main session. See the invocation-control cluster in *SKILL.md frontmatter* below.
+
+**Traps:** treating "custom slash command" and "skill" as two mechanisms to choose between (unified — same `/name`, same behavior); "command = manual-only, skill = auto-only" (both invoke modes belong to one skill; the axis is `disable-model-invocation`/`user-invocable`); routing a store-and-surface procedure to a **subagent** because it "also loads on demand" (shared property ≠ shared purpose — subagent = delegate/isolate).
+
+*(source: [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills) — "Custom commands have been merged into skills", Control who invokes a skill · [commands](https://code.claude.com/docs/en/commands) · [sub-agents](https://code.claude.com/docs/en/sub-agents))*
+
+---
+
 ### Skills / commands precedence — one wins, and Personal BEATS Project
 
 > **Skills & commands are *config* → exactly one definition is selected by name, the rest discarded. Ladder: `Enterprise > Personal > Project > bundled`. ⚠️ Personal beats Project — the REVERSE of MCP scopes.**
@@ -394,7 +416,7 @@ Deployed by **MDM** (Jamf/Kandji), **Group Policy / Intune** (Windows HKLM `…\
 - [~] `settings.json` vs `settings.local.json`; permission allow/deny lists; precedence *(permission **modes** done above · **settings-file precedence + per-key merge (scalar→local wins, permissions→union, deny>allow) + auto-git-excludes done above** — still to cover: full allow/ask/deny rule **syntax**, `deny > ask > allow` resolution within a single list)*
 - [x] CLAUDE.md memory hierarchy (user / project / local) — concatenation & load order done above · **choosing a home (scope/sharing/persistence axes) done above** · still: keep-lean (<200 lines) guidance
 - [x] `claude-code-action` v1.0 migration (three buckets: dropped / named-input / `claude_args` flags) — done above (subdomain 3.6)
-- [~] Slash commands / subagents / skills — **skills precedence done above** · **SKILL.md frontmatter (4 clusters) done above** · still: `.claude/commands/` authoring & frontmatter, subagent definitions
+- [~] Slash commands / subagents / skills — **skills precedence done above** · **SKILL.md frontmatter (4 clusters) done above** · **commands-are-skills unification + invocation axis done above** · still: subagent definitions (`.claude/agents/` frontmatter fields, delegate-and-isolate vs store-and-surface)
 - [x] Instruction observability — five-tool model (`/memory` vs `/context` vs `InstructionsLoaded` vs Pre/PostToolUse vs `claudeMdExcludes`) + load-vs-adherence branch — done above
 - [x] Plan × auto composition (`useAutoModeDuringPlan`) + read-only-allowlist nuance — done above
 - [x] AGENTS.md `@import` + version-gated path-rule behaviors (symlink match v2.1.198, bracket isolation v2.1.207, glob budget) — done above

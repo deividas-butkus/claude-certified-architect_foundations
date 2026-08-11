@@ -26,6 +26,7 @@
 - **Right tool, wrong question** — a correct technique the qualifier excluded.
 - **The temperature knob** — offered whenever the real issue is an unanchored target or a needed guarantee.
 - **Same wording, flipped context** — an option that was correct on a previous item, wrong here (watch confidence flags, reversibility, verified-state).
+- **Shared property ≠ shared purpose** — two mechanisms share one true trait ("both load on demand") and the distractor rides it to the wrong *category*. Cut to what each is *for*: skill = **store-and-surface** a procedure into the current session; subagent = **delegate-and-isolate** to a separate context. A checklist you want to *follow yourself* → skill, even though a subagent "also loads on demand." *(D3)*
 - **Efficiency / diligence bait** — "try first," "gather more," "reduce the amount" — plausible but violates an explicit request or a guardrail.
 - **Over-block / flatten** — treating every case with maximum strictness (`deny` everything) instead of proportionally.
 
