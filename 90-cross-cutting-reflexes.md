@@ -29,6 +29,7 @@
 - **Shared property ≠ shared purpose** — two mechanisms share one true trait ("both load on demand") and the distractor rides it to the wrong *category*. Cut to what each is *for*: skill = **store-and-surface** a procedure into the current session; subagent = **delegate-and-isolate** to a separate context. A checklist you want to *follow yourself* → skill, even though a subagent "also loads on demand." *(D3)*
 - **Efficiency / diligence bait** — "try first," "gather more," "reduce the amount" — plausible but violates an explicit request or a guardrail.
 - **Over-block / flatten** — treating every case with maximum strictness (`deny` everything) instead of proportionally.
+- **Ideal-world option that isn't on the menu** — answer within the *given* option set, not the theoretically-best mechanism. If the newest/recommended approach isn't offered, the correct answer is the best *listed* one that still meets every stated constraint — don't reject a valid legacy option because a better unlisted one exists. (Q4: `/review` command → `.claude/commands/` (A) is correct even though `.claude/skills/` is the recommended authoring form today — skills weren't an option, and a project `commands/` file still satisfies *shared + on-clone + real mechanism*. Legacy command files still work post-merge.) Pairs with *"commands ARE skills"* in [03](03-claude-code-config.md).
 
 ---
 
