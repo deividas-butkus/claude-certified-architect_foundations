@@ -110,7 +110,15 @@
 | Script: always hit one exact thread | **`claude --resume <session-id>`** (immutable ID — most robust) |
 | "Keep going" — most-recent, one project | **`claude --continue`** |
 | Browse when you don't recall the handle | **`--resume` / `/resume`** with no arg → interactive picker |
+| **Continue the *same* thread further** (recover from a limit, follow up) | **resume** (`resume`/`fork_session:false`) |
+| **Branch to a *different* direction, keep original intact** | **fork** (`fork_session: true` / `forkSession: true`) |
 | Persist *facts/instructions* across sessions | **CLAUDE.md / memory dir** — *not* session resume |
+
+**SDK resume vs fork (Agent SDK `query()` options):** *resume* re-addresses **one** thread and adds to it (same session ID, full prior context). *fork* makes a **new** session that starts with a **copy** of the history and diverges — original ID/history untouched → two independent sessions.
+- **Recover from `error_max_turns` / `error_max_budget_usd`** → **resume with a higher `max_turns`** (the doc's named recovery path). `max_turns` is a **per-`query()` option**, settable on *any* call (resume, fork, or fresh) — it is **not** a fork-only capability.
+- **Fork only when you want the original preserved for comparison / a "go back" option** while exploring an alternative — *not* to "give it more room to keep going."
+- Sessions persist the **conversation, not the filesystem** — a forked agent's file edits are real and visible to siblings in the same dir (use **file checkpointing** to branch/revert files).
+- Decider: *"keep going on the one investigation"* → **resume**; *"two threads I can compare later / don't alter the original"* → **fork**.
 
 - **`--continue` = most-recent session in this project.** Breaks under **parallel same-day sessions** (ambiguous "most recent") → use `--resume <name/id>` to disambiguate. This is the usual exam disqualifier.
 - **`--resume` takes name | id | (nothing → picker).** Every session always has a resumable **ID**; `-n`/`/rename` adds a *human-memorable* handle on top (v2.1.76+).
@@ -119,7 +127,7 @@
 
 **Traps:** `--continue` when sessions run in parallel (grabs the wrong one); writing transcript/context into **CLAUDE.md** to "resume" (category error — that's knowledge, not the conversation; new session starts fresh); interactive `/resume` picker inside a **headless** `-p` script (no TTY → no-op/hang).
 
-*(source: [code.claude.com/docs/en/sessions](https://code.claude.com/docs/en/sessions) · [agent-sdk/sessions](https://platform.claude.com/docs/en/agent-sdk/sessions))*
+*(source: [code.claude.com/docs/en/sessions](https://code.claude.com/docs/en/sessions) · [agent-sdk/sessions](https://code.claude.com/docs/en/agent-sdk/sessions))*
 
 ---
 
