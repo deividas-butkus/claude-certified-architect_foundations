@@ -188,13 +188,6 @@
 
 *(source: [platform.claude.com/docs/en/build-with-claude/batch-processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing) — "each request handled independently"; unsupported-params table `stream: true` → "come back as a single file, not a stream"; "All server tools … work in batch requests. The batch worker runs the same server-side agentic loop"; `pause_turn` continuation. Server-tool list: [server-tools](https://platform.claude.com/docs/en/agents-and-tools/tool-use/server-tools).)*
 
-**Sizing the submission window against an arrival-anchored SLA.** When the SLA deadline is measured from **document arrival** (not from batch submission), the binding case is the **oldest** document in a window — it has already aged the full window length before the batch even goes out. Budget:
-
-> **worst-case latency = window length `W` + 24 h (max processing, i.e. expiration ceiling) + retry margin**
-
-- The **24 h is an expiration *ceiling*, not a target** — docs: *"Batches expire if processing does not complete within 24 hours"*, and under load *"you may see more requests expiring after 24 hours"* (returned as `expired`, must be **resubmitted**). So a high-**reliability** SLA (99.9 %) means you must budget for at least one expired-and-resubmitted request *still* finishing in time — leave slack, don't size to the ceiling.
-- **The trap:** the window that makes `W + 24h` land *exactly* on the SLA deadline (e.g. 6 h window → 6 + 24 = 30 h vs a 30 h SLA) is **arithmetically "fits" but has zero margin** — one slowdown or expiration breaches it, so it fails the reliability half. Pick the largest window that leaves a **retry buffer** (4 h window → 4 + 24 = 28 h, 2 h slack under a 30 h SLA). Bigger windows batch more docs = cheaper, but the *oldest-doc + retry* budget caps how big you can go. **Deadline-from-arrival → size the window off the oldest doc, and reserve room for a resubmit.**
-
 ---
 
 ## False-positive reduction — deterministic tolerance, not a severity dial *(subdomain 4.1)*
