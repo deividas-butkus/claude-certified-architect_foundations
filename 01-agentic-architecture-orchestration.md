@@ -25,20 +25,36 @@ Multi-step workflows, enforcement, handoff, human-in-the-loop.
 
 ---
 
-## Permission decisions: `allow` / `ask` / `deny` / defer
+## Permission decisions: `allow` / `ask` / `deny` / `defer`
+
+These four are the `PreToolUse` **hook** `permissionDecision` values ([hooks doc](https://code.claude.com/docs/en/agent-sdk/hooks)). Precedence when several apply: **`deny` > `defer` > `ask` > `allow`.**
 
 | Decision | Use when | Watch-out |
 |----------|----------|-----------|
 | `allow` | Provably safe **and** in your hook's scope; you intend to guarantee it runs | It **overrides** the permission system — never use it outside your hook's lane |
 | `ask` | A **disclosure** or a **reversible** change that deserves a human check | Resolves to a human on *your* side (user or operator) — **never** the provider |
 | `deny` | **Irreversible / high-stakes** with an unmet precondition | Stops the **action, not the agent** — reason flows back to the model, which adapts |
-| defer *(no decision)* | The call is **outside your hook's concern** | Not a literal value — you abstain so other layers/defaults decide |
+| `defer` | Approval may take **longer than the process can stay running** | **Ends the query** so the process can exit; resume later from the **persisted session**. `updatedInput` is **dropped**. About *time*, not *who decides* |
 
 - **`ask` ≠ `deny`.** `ask` can still run (if approved); `deny` never runs.
+- **`ask` ≠ `defer`.** `ask` keeps the query **paused in-process** waiting on `canUseTool`; `defer` **tears the process down** and reconstitutes the decision on session resume. Same "not-decided-yet" feel, opposite process lifecycle.
+- **`defer` is a hook decision, not a `canUseTool` return** — the callback returns only `allow`/`deny` (see below). Don't confuse "the call routed *to* `ask`" with a `defer`.
 - **`ask`-the-user** answers *"is it really you?"* (establishes a precondition — good for reads).
 - **`deny`** an irreversible action while a precondition is unmet, run verification as its **own** flow, then re-decide on a fresh attempt.
 - **"Please identify" is a `deny`-shaped task** (establish a precondition), not an `ask` (which only collects a yes/no on the pending call).
 - **`deny` stops the action, not the conversation** — the reason returns to the model, which adapts (explains, reroutes, requests the precondition).
+- **Who resumes a `defer`:** nobody in the SDK — it just persists the session. **Your host app** calls `query({ resume: <session_id> })` when *your* external trigger fires (approval webhook, user click, queue/cron). No built-in scheduler/poller.
+
+**Worked example — agent handling a customer refund:**
+
+| Tool call | Decision | Why |
+|-----------|----------|-----|
+| `Read` order history | `allow` | Read-only, safe, in-scope — just run it |
+| `Bash(rm -rf …)` / write outside workspace | `deny` | Irreversible, precondition can never be met — block, reason to model |
+| Email refund confirmation to customer | `ask` | Reversible-ish, human is **on-shift** → resolves in seconds via `canUseTool` |
+| Issue $5,000 refund needing manager sign-off | `defer` | Approver is in a **separate system, maybe tomorrow** → kill process, resume on webhook |
+
+> `ask` vs `defer` turns purely on **approval latency**: seconds-and-someone's-there → `ask`; slow/async/offline → `defer`.
 
 ---
 

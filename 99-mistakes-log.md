@@ -24,17 +24,23 @@
 - **Picked:** "only partially — subdirs ignore `paths` frontmatter" ✗ · **Correct:** yes, all `.md` discovered recursively ✓
 - **Why wrong:** fell for a **fabricated mechanism**. Location never drives scope; `paths:` frontmatter does. Folder = discovery, frontmatter = scope.
 
-### 2026-07-15 — defer vs allow (hook scope) · Domain 1
+### 2026-07-15 — abstain vs allow (hook scope) · Domain 1
 
 - **Scenario:** single-purpose hook sees an unrelated, harmless tool. What to return?
-- **Picked:** `allow` ✗ · **Correct:** defer (no decision) ✓
-- **Why wrong:** "harmless" doesn't earn `allow`. `allow` overrides the permission system; outside your lane → **defer** so other layers decide.
+- **Picked:** `allow` ✗ · **Correct:** abstain — return `{}` / omit `permissionDecision` so normal evaluation continues ✓
+- **Why wrong:** "harmless" doesn't earn `allow` (which overrides the permission system). Outside your lane → **abstain**, don't affirm. ⚠️ *Corrected 2026-08-12: "abstain" here is `{}`/no-`permissionDecision`, **not** `defer`. `defer` ends the query for later resume — see below.*
 
 ### 2026-07-15 — Pre vs Post (handoff) · Domain 3/5
 
 - **Scenario:** flipping state / logging *after* a verification tool runs — which mechanism?
 - **Picked:** defer ✗ · **Correct:** `PostToolUse` hook ✓
 - **Why wrong:** missed "after the tool runs." `Pre` = enforcement (before); `Post` = handoff/reaction (after).
+
+### 2026-08-12 — What `defer` actually means · Domain 1
+
+- **Scenario:** asked to explain `ask` vs `defer`. Answered from memory: "`defer` = hand the decision up to the orchestrator/parent agent; abstain so other layers decide."
+- **Correct (per [hooks doc](https://code.claude.com/docs/en/agent-sdk/hooks)):** `defer` = a `PreToolUse` hook decision that **ends the query so the process can exit**, to be **resumed later from the persisted session**. It's about *time / process lifecycle* when approval will take too long — not about *which agent decides*. `updatedInput` is dropped with `defer`.
+- **Why wrong:** invented an orchestrator-delegation mechanism. Two conflations to kill: (1) `defer` ≠ "abstain" — abstaining is `{}`/no-`permissionDecision`; `defer` actively kills the query. (2) `defer` is a **hook** decision, **not** a `canUseTool` return — the callback returns only `allow`/`deny`; `ask` is a rule/hook outcome that *routes into* that callback. Precedence: **`deny` > `defer` > `ask` > `allow`**. *(Also triggered the "verify version-gated/mechanism claims before asserting" rule — I answered from memory twice before fetching.)*
 
 ### 2026-07-15 — enum guarantee vs nudge · Domain 4
 
