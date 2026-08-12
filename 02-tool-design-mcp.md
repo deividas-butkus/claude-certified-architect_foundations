@@ -53,9 +53,11 @@
 
 | Scope | Who sees it | Where it applies | Committed? | Add command |
 |---|---|---|---|---|
-| **Local** (default) | only you | this project only | no (`~/.claude.json`, keyed by path) | `claude mcp add <name>` |
+| **Local** (default) | only you | this project only | no — `~/.claude.json`, **nested under this project** in its `projects` map | `claude mcp add <name>` |
 | **Project** | whole team | this project only | **yes** (`.mcp.json` at repo root) | `claude mcp add --scope project <name>` |
-| **User** | only you | all your projects | no (global user config) | `claude mcp add --scope user <name>` |
+| **User** | only you | all your projects | no — `~/.claude.json`, **top-level** `mcpServers` | `claude mcp add --scope user <name>` |
+
+- **Local & User share the file `~/.claude.json`** — different sections: Local = per-project (nested), User = top-level (global). Only **Project** lives in a separate, committed file (`.mcp.json`). So "same file" ≠ "same scope."
 
 - **Two independent axes:** *me or the team?* ⟂ *here or everywhere?* (Local = me+here · Project = team+here · User = me+everywhere.)
 - **Precedence (high → low):** `Local > Project > User > Plugins > claude.ai connectors`. Scopes match duplicates **by name**; **plugins *and* connectors** match **by endpoint**.
