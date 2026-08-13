@@ -1,79 +1,65 @@
-# Drill system — design & setup
+# Drill skill — ChatGPT / Codex version
 
-This directory holds a self-contained system for running **CCA-F practice drills** in Claude Code
-without two recurring failure modes: the model **leaking answers** into the chat, and the
-**A/B/C/D answer distribution skewing** (drifting to B/C so you pattern-match position instead of
-reasoning).
+A skill for running **CCA-F practice drills** that avoids three habits that undermine practice:
+the model **revealing answers early**, **skewing the A/B/C/D distribution** (toward B/C, starving
+D), and **telegraphing the answer** via formatting or option length.
 
-The design principle throughout: **hook what dumb code can prove and what fails silently; instruct
-what needs judgment and is self-evident while writing.** A guarantee needs code, not a prompt.
+This is the **portable, instructions-only** version. It follows the
+[Agent Skills open standard](https://learn.chatgpt.com/docs/build-skills) — a folder with a
+`SKILL.md` — so it works in ChatGPT and Codex.
 
-## The three pieces
+## How this differs from the Claude Code version
 
-| Piece | Location | Kind | Job |
-|---|---|---|---|
-| **`drill` skill** | `.claude/skills/drill/SKILL.md` | procedure (instructions) | The playbook: leak-avoidance, plain-text stems, balanced options, one-question-at-a-time, and the even A/B/C/D spread. Invokes on any drill/quiz/practice request. |
-| **Stop hook** | `.claude/hooks/drill-distribution-check.js` | enforcement (code) | The only piece that *guarantees* anything. Fires when the model ends its turn; audits the recorded key and **blocks the turn** if the distribution is skewed. |
-| **`record-drill-key.js`** | `.claude/skills/drill/scripts/record-drill-key.js` | helper (code) | The skill calls it to `--clear` stale state at drill start and to record the used key at drill end — both **silently**, so answers never reach the chat. |
+The original (Claude Code) setup had two halves:
+- a **skill** carrying the authoring rules (this file's `SKILL.md`), and
+- a **Stop hook** — code that ran automatically when the model finished its turn and **blocked**
+  the turn if the answer distribution was skewed. That made even distribution a *guarantee*.
 
-## Why the split (skill vs. hook)
+**ChatGPT and Codex have no hook mechanism.** Per OpenAI's own docs, a skill is invoked by the
+model's decision (or your explicit "use the drill skill"), and there is no turn-end/stop event
+that runs your code unconditionally. So the hook cannot be ported.
 
-- **Even distribution** is a *global* property that fails *silently* (a skewed quiz looks perfect)
-  and can't be self-audited mid-generation (the model can't reliably count where answers landed).
-  → needs the **Stop hook** (deterministic code that counts and blocks).
-- **Plain-text stems, length symmetry, plausible distractors, one-at-a-time** are *per-question
-  judgment* calls, visible in the moment. → live in the **skill** as instructions; no hook.
+**What that means, honestly:**
 
-## Data flow
+| Rule | Claude Code | ChatGPT / Codex |
+|---|---|---|
+| Plain-text stems, balanced options, one-at-a-time, reveal-after | instruction | **instruction (same)** |
+| Even A/B/C/D distribution | **guaranteed** (hook blocks skew) | **asked-for, not guaranteed** |
 
-```
-/drill invoked
-  └─ step 0: record-drill-key.js --clear      → removes any stale .drill-key.json
-  └─ questions asked one at a time            → answers live ONLY in the model's reasoning
-  └─ step 5: record-drill-key.js A C D B ...   → writes {"key":[...]} to .drill-key.json
-model ends turn
-  └─ Stop hook reads .drill-key.json          → counts letters; ALLOW or BLOCK-with-fix-reason
-```
+The distribution rule here relies on the model following step 1 (plan the whole key first). Strong
+models often do this well; it is not enforced. If you need a hard guarantee across arbitrary
+models, that belongs in a wrapper you control (see "If you need a real guarantee" below), not in a
+skill.
 
-`.claude/.drill-key.json` is the **handoff file** between the writer (skill helper) and the reader
-(Stop hook). It is **gitignored** — per-user throwaway state, one drill's key at a time.
+## Install
 
-## Distribution rules the hook enforces
+**ChatGPT** (Business/Enterprise/Edu, where Skills are available):
+1. Skills → create a skill (or import a folder).
+2. Provide this `SKILL.md` as the skill body.
+3. In a chat, invoke with `@drill` (or just ask for practice questions and let it match).
 
-For a key of length `n` (see `drill-distribution-check.js`):
-- **Per-letter cap:** no letter appears more than `ceil(n/4)+1` times (e.g. 4 for n=10).
-- **Run cap:** no letter appears 4+ times **in a row**.
+**Codex** (CLI / IDE):
+1. Place this `skills/drill/` folder where Codex discovers skills.
+2. Invoke with `/skills` or `$drill`.
 
-Short runs (up to 3 in a row) are *intentionally allowed* — forbidding all repeats would itself be
-a predictable pattern. The skill tells the model to aim tighter (even 2–3 spread) so the hard cap
-rarely trips.
+Either way the skill is **instructions only** — nothing to run, no dependencies.
 
-## Setup for a teammate (cloning this repo)
+## Verify it actually stays balanced (recommended)
 
-1. **Node.js** must be on `PATH` — both the hook and the helper are `node` scripts.
-2. The Stop-hook wiring lives in **`.claude/settings.json`** (tracked, shared). No per-user setup
-   needed; Claude Code picks it up automatically. (`settings.local.json` is personal and
-   git-ignored — do not put shared hook wiring there.)
-3. `$CLAUDE_PROJECT_DIR` is set by Claude Code; the scripts rely on it to locate the key file.
-4. Nothing to install — the scripts use only Node built-ins (`fs`, `path`).
+Because distribution is not enforced here, measure it before trusting it on your model. The
+`test/` folder has a protocol and a tally script:
 
-## Verify it works
+1. Follow `test/PROTOCOL.md` — run ~200 pooled drill answers across mixed/hard/easy sets.
+2. Record each drill's correct-answer letters into `answers.txt` (see `test/answers.example.txt`).
+3. `node test/tally.js answers.txt` → prints the distribution and a PASS/FAIL verdict, flagging
+   D-starvation and B-crowding specifically.
 
-```sh
-# Record a good (balanced) key, then run the hook — should allow (empty output, exit 0):
-node .claude/skills/drill/scripts/record-drill-key.js A B C D A B C D
-echo '{}' | node .claude/hooks/drill-distribution-check.js
+A PASS means "sufficient **for the model you tested**" — it is a snapshot, not a portable
+guarantee. A different model may skew differently.
 
-# A skewed key should BLOCK with a fix reason:
-printf '{"key":["B","B","B","B","B"]}' > .claude/.drill-key.json
-echo '{}' | node .claude/hooks/drill-distribution-check.js   # → {"decision":"block", ...}
+## If you need a real guarantee (any LLM)
 
-# Clean up:
-node .claude/skills/drill/scripts/record-drill-key.js --clear
-```
-
-## Known sharp edge
-
-The distribution *guarantee* depends on the skill actually calling the recorder at drill end. If
-that step is skipped, no key file is written and the Stop hook allows the turn unaudited. Step 5
-of the skill is marked non-optional for this reason.
+Move enforcement out of the chat into a thin wrapper you control: pick a balanced A/B/C/D key in
+code, ask the LLM to write questions for those pre-assigned slots, validate the returned
+distribution, and regenerate on skew. That logic is provider-agnostic (~30 lines, no vendor
+lock-in) — it's the same audit the Claude Stop hook did, driven by your loop instead of a hook.
