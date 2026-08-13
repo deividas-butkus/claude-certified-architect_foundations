@@ -39,7 +39,9 @@ skill.
 3. In a chat, invoke with `@drill` (or just ask for practice questions and let it match).
 
 **Codex** (CLI / IDE):
-1. Place this `skills/drill/` folder where Codex discovers skills.
+1. Put this `drill/` folder under a skills directory Codex scans. Codex reads `.agents/skills/`
+   from your working directory up to the repo root (repo scope), plus `~/.agents/skills/` (user
+   scope). In this repo it already lives at `.agents/skills/drill/`, so a checkout is picked up.
 2. Invoke with `/skills` or `$drill`.
 
 Either way the skill is **instructions only** — nothing to run, no dependencies.
