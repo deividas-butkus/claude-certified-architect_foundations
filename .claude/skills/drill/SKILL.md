@@ -15,22 +15,41 @@ is in progress. Do not write the key to a file mid-drill, do not `echo`/`cat`/`r
 do not Read the key back. The answer for each question lives ONLY in the model's own reasoning
 until the user has answered that question. The model states the verdict from memory, in prose.
 
-There is no keygen/reveal step during the drill. Those approaches leak because their output is
-visible. (`drill-keygen.js`/`drill-reveal.js` may exist in the repo but MUST NOT be used to
-read answers into the chat.)
+The only script involved is `scripts/record-drill-key.js`: it clears stale state at the start
+(step 0) and writes the used key at the very end (step 5). Both calls are silent. Never use any
+script to print or read an answer into the chat.
+
+## 0. Clear stale key state before starting
+The key file persists between drills. Before asking the first question, clear it so a previous
+drill's key cannot trigger a spurious Stop-hook block on this turn. Single silent command:
+
+```
+node "$CLAUDE_PROJECT_DIR/.claude/skills/drill/scripts/record-drill-key.js" --clear
+```
 
 ## 1. Plan the hidden key in your head, and hold it in reasoning
-Before writing questions, decide the correct-answer letter for every position. Constraints for
-N questions:
+Before writing questions, decide the correct-answer letter for every position. Aim for:
 - Each of A/B/C/D used roughly evenly (for N=10: each 2–3 times).
-- No letter more than ~3× in 10 (scale for other N).
 - No run of the same letter 4+ times in a row.
+
+These are targets to aim tighter than the hard limits. The Stop hook only *blocks* when a letter
+exceeds `ceil(N/4)+1` (e.g. 4 for N=10) or a letter runs 4+ in a row — so aiming for an even 2–3
+spread keeps you comfortably inside the audit.
 
 Keep this sequence in your reasoning. Do NOT print it, write it, or echo it anywhere.
 
 ## 2. Plain-text stems
 Write question stems in plain text. Do NOT bold or italicize any phrase that gives away the
 answer. Save emphasis of the decisive cue for the explanation AFTER the user answers.
+
+## 2a. Balanced options (length symmetry + plausible distractors)
+Within each question, make the four options hard to tell apart by shape alone:
+- **Length symmetry:** keep all four roughly equal in length, sentence structure, and technical
+  complexity. Never let the correct answer be the longest or most detailed — that leaks it.
+- **Plausible distractors:** every wrong option should reflect a real misconception someone who
+  half-knows the material might hold. No obvious throwaways or joke answers.
+These are per-question qualities — you can balance them while writing each question; there is no
+hook that checks them, so they rely on you applying the rule.
 
 ## 3. One question at a time
 Present exactly one question with its four options, placing the correct option at the letter
@@ -41,12 +60,16 @@ After the user answers, state right/wrong and explain the decisive cue — all f
 reasoning, in prose. Then present the next question. Never reveal a future question's answer.
 
 ## 5. Record the key ONLY at the very end, for the Stop-hook audit
+This step is NOT optional. The Stop hook can only audit distribution when the key file exists —
+if you skip recording, no file is written, the hook silently allows the turn, and a skewed key
+ships unchecked. Recording is what turns the distribution rule from a suggestion into a guarantee.
+
 After the LAST question is answered and scored, write the full key you actually used to
 `.claude/.drill-key.json` (gitignored) via a single silent command so the Stop hook can audit
 distribution:
 
 ```
-node "$CLAUDE_PROJECT_DIR/.claude/hooks/drill-keygen.js" --record A C D B ...
+node "$CLAUDE_PROJECT_DIR/.claude/skills/drill/scripts/record-drill-key.js" A C D B ...
 ```
 
 Because the drill is already over, this is not a leak — every answer has been disclosed. If
